@@ -1,8 +1,6 @@
-# Include the README
-include *.md
-
-# Include the license file
 include LICENSE
-
-# Include the data files
-recursive-include dtsdk *.py
+include README.md
+prune example
+global-exclude __pycache__
+global-exclude *.log
+global-exclude *.pyc

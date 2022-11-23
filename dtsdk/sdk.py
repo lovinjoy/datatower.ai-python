@@ -8,7 +8,7 @@ import os
 import re
 import threading
 import time
-
+import random
 import requests
 from requests import ConnectionError
 
@@ -16,7 +16,8 @@ default_server_url = "https://s2s.roiquery.com/sync"
 __version__ = '1.0.0'
 is_print = False
 
-__NAME_PATTERN = re.compile(r"^[#a-zA-Z][a-zA-Z0-9_]{0,49}$", re.I)
+__NAME_PATTERN = re.compile(r"^[#$a-zA-Z][a-zA-Z0-9_]{0,63}$", re.I)
+_STR_LD = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 try:
     import queue
@@ -26,6 +27,8 @@ except ImportError:
     from urlparse import urlparse
 try:
     isinstance("", basestring)
+
+
     def is_str(s):
         return isinstance(s, basestring)
 except NameError:
@@ -33,6 +36,8 @@ except NameError:
         return isinstance(s, str)
 try:
     isinstance(1, long)
+
+
     def is_int(n):
         return isinstance(n, int) or isinstance(n, long)
 except NameError:
@@ -48,7 +53,14 @@ def isNumber(s):
     return False
 
 
-def assert_properties(action_type, properties):
+def random_str(byte=32):
+    return ''.join(random.choice(_STR_LD) for i in range(byte))
+
+
+def assert_properties(event_name, properties):
+    if not __NAME_PATTERN.match(event_name):
+        raise DTIllegalDataException(
+            "Event_name must be a valid variable name.")
     if properties is not None:
         for key, value in properties.items():
             if not is_str(key):
@@ -59,10 +71,10 @@ def assert_properties(action_type, properties):
 
             if not __NAME_PATTERN.match(key):
                 raise DTIllegalDataException(
-                    "type[%s] property key must be a valid variable name. [key=%s]" % (action_type, str(key)))
+                    "Event_name=[%s] property key must be a valid variable name. [key=%s]" % (event_name, str(key)))
 
-            if 'user_add' == action_type.lower() and not isNumber(value) and not key.startswith('#'):
-                raise DTIllegalDataException('user_add properties must be number type')
+            if '#user_add' == event_name.lower() and not isNumber(value):
+                raise DTIllegalDataException('User_add properties must be number type')
 
 
 def log(msg=None):
@@ -130,9 +142,9 @@ class DTAnalytics(object):
         self.__consumer = consumer
         self.__super_properties = {}
         self.__dynamic_super_properties_tracker = None
-        self.app_id = consumer.get_app_id()
+        self.__app_id = consumer.get_app_id()
         self.__preset_properties = {
-            '#app_id': self.app_id,
+            '#app_id': self.__app_id,
             '#sdk_type': 'dt_python_sdk',
             '#sdk_version_name': __version__,
         }
@@ -142,7 +154,7 @@ class DTAnalytics(object):
     def set_dynamic_super_properties_tracker(self, dynamic_super_properties_tracker):
         self.__dynamic_super_properties_tracker = dynamic_super_properties_tracker
 
-    def user_set(self, dt_id, acid=None, properties=None):
+    def user_set(self, dt_id=None, acid=None, properties=None):
         """
         设置用户属性
 
@@ -158,7 +170,7 @@ class DTAnalytics(object):
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_set', send_type='user',
                    properties_add=properties)
 
-    def user_unset(self, dt_id, acid=None, properties=None):
+    def user_unset(self, dt_id=None, acid=None, properties=None):
         """
         删除某个用户的用户属性
 
@@ -173,7 +185,7 @@ class DTAnalytics(object):
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_unset', send_type='user',
                    properties_add=properties)
 
-    def user_set_once(self, dt_id, acid=None, properties=None):
+    def user_set_once(self, dt_id=None, acid=None, properties=None):
         """
         设置用户属性, 不覆盖已存在的用户属性
 
@@ -188,7 +200,7 @@ class DTAnalytics(object):
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_set_once', send_type='user',
                    properties_add=properties)
 
-    def user_add(self, dt_id, acid=None, properties=None):
+    def user_add(self, dt_id=None, acid=None, properties=None):
         """
         对指定的数值类型的用户属性进行累加操作
 
@@ -204,7 +216,7 @@ class DTAnalytics(object):
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_add', send_type='user',
                    properties_add=properties)
 
-    def track(self, dt_id, event_name, acid=None, properties=None):
+    def track(self, dt_id=None, acid=None, event_name=None, properties=None):
         """
         发送事件数据
 
@@ -224,7 +236,7 @@ class DTAnalytics(object):
         all_properties = self._public_track_add(event_name, properties)
         self.__add(dt_id=dt_id, acid=acid, send_type='track', event_name=event_name, properties_add=all_properties)
 
-    def track_first(self, dt_id, acid=None, event_name='#app_install', properties=None):
+    def track_first(self, dt_id=None, acid=None, event_name='#app_install', properties=None):
         """
         发送安装事件数据
 
@@ -273,28 +285,38 @@ class DTAnalytics(object):
 
     def __add(self, dt_id, acid, send_type, event_name=None, properties_add=None):
         if dt_id is None and acid is None:
-            raise DTException("Distinct_id and account_id must be set at least one")
-        data = {'#event_type': send_type}
+            raise DTException("dt_id and acid must be set at least one")
+        if (dt_id is not None and not is_str(dt_id)) or (acid is not None and not is_str(acid)):
+            raise DTException("dt_id and acid must be string type")
 
+        assert_properties(event_name, properties_add)
+
+        data = {'#event_type': send_type}
         if properties_add:
             properties = properties_add.copy()
         else:
             properties = {}
 
-        properties.update({'#app_id': self.app_id})
-        if self.debug:
-            properties.update({'#debug': 'true'})
         self.__movePresetProperties(['#app_id', '#debug', '#event_time', '#event_syn'], data, properties)
 
-        if self.debug:
-            assert_properties(send_type, properties)
         if '#event_time' not in data:
             self.__buildData(data, '#event_time', int(time.time() * 1000))
-        if '#event_syn' not in data:
-            self.__buildData(data, '#event_syn', "0")
+        if not is_int(data.get('#event_time')) or len(str(data.get('#event_time'))) != 13:
+            raise DTException("event_time must be timestamp (ms)")
 
+        if '#event_syn' not in data:
+            self.__buildData(data, '#event_syn', random_str(16))
+
+        if dt_id is None:
+            self.__buildData(data, '#dt_id', '0000000000000000000000000000000000000000')
+        else:
+            self.__buildData(data, '#dt_id', dt_id)
+
+        if self.debug:
+            self.__buildData(data, '#debug', 'true')
+
+        self.__buildData(data, '#app_id', self.__app_id)
         self.__buildData(data, '#event_name', event_name)
-        self.__buildData(data, '#dt_id', dt_id)
         self.__buildData(data, '#acid', acid)
         data['properties'] = properties
         content = json.dumps(data, separators=(',', ':'), cls=DTDateTimeSerializer)
@@ -411,7 +433,8 @@ class BatchConsumer(object):
     _batchlock = threading.RLock()
     _cachelock = threading.RLock()
 
-    def __init__(self, app_id, token, batch=20, server_url=default_server_url, timeout=30000, interval=3, compress=True, max_cache_size=50):
+    def __init__(self, app_id, token, batch=20, server_url=default_server_url, timeout=30000, interval=3, compress=True,
+                 max_cache_size=50):
         """
         创建 BatchConsumer
 
@@ -430,10 +453,10 @@ class BatchConsumer(object):
         self.__last_flush = time.time()
         self.__http_service = _HttpServices((urlparse(server_url)).geturl(), app_id, token, timeout)
         self.__http_service.compress = compress
-        self.app_id = app_id
+        self.__app_id = app_id
 
     def get_app_id(self):
-        return self.app_id
+        return self.__app_id
 
     def add(self, msg):
         self._batchlock.acquire()
@@ -490,8 +513,10 @@ class BatchConsumer(object):
 
 
 class DebugConsumer(BatchConsumer):
-    def __init__(self, app_id, token, server_url=default_server_url, timeout=30000, interval=3, compress=True, max_cache_size=50):
-        super(DebugConsumer, self).__init__(app_id=app_id, token=token, server_url=server_url, batch=1, timeout=timeout, interval=interval, \
+    def __init__(self, app_id, token, server_url=default_server_url, timeout=30000, interval=3, compress=True,
+                 max_cache_size=50):
+        super(DebugConsumer, self).__init__(app_id=app_id, token=token, server_url=server_url, batch=1, timeout=timeout,
+                                            interval=interval, \
                                             compress=compress, max_cache_size=max_cache_size)
 
 
@@ -523,10 +548,10 @@ class AsyncBatchConsumer(object):
         self.__flushing_thread = self._AsyncFlushThread(self, interval)
         self.__flushing_thread.daemon = True
         self.__flushing_thread.start()
-        self.app_id = app_id
+        self.__app_id = app_id
 
     def get_app_id(self):
-        return self.app_id
+        return self.__app_id
 
     def add(self, msg):
         try:
@@ -650,7 +675,7 @@ class _HttpServices(object):
                 compress_type = 'none'
                 data = data.encode("utf-8")
             headers['compress'] = compress_type
-            #print(self.url,data,headers)
+            # print(self.url,data,headers)
             response = requests.post(self.url, data=data, headers=headers, timeout=self.timeout)
             if response.status_code == 200:
                 responseData = json.loads(response.text)

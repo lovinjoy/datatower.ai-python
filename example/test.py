@@ -5,8 +5,8 @@ from dtsdk.sdk import DTException, DTAnalytics, BatchConsumer, AsyncBatchConsume
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-dt = DTAnalytics(AsyncBatchConsumer(app_id="app_id_xxxx", token="RNyVDsSzDKdwhuza4huibkobSvGbfB2d",server_url="https://test.roiquery.com/sync"))
-#dt =DTAnalytics(BatchConsumer(app_id="app_id_xxxx", token="RNyVDsSzDKdwhuza4huibkobSvGbfB2d"), debug=True)
+dt = DTAnalytics(AsyncBatchConsumer(app_id="app_id_xxxx", token="xxxxxxxxxxxxxxxxxxxxxxx",server_url="https://test.roiquery.com/sync"))
+#dt =DTAnalytics(BatchConsumer(app_id="app_id_xxxx", token="xxxxxxxxxxxxxxxxxxxxxxx"), debug=True)
 dt.enable_log(True) # 如果您想看log，请打开log标志
 common = {"#os":"android","app_version":"2.1"}
 dt.set_super_properties(common)
