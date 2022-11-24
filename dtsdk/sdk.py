@@ -148,7 +148,7 @@ class DTAnalytics(object):
             '#sdk_type': 'dt_python_sdk',
             '#sdk_version_name': __version__,
         }
-        self.debug = debug if debug else False
+        self.debug = debug
         self.clear_super_properties()
 
     def set_dynamic_super_properties_tracker(self, dynamic_super_properties_tracker):
@@ -164,7 +164,6 @@ class DTAnalytics(object):
         Args:
             dt_id: 访客 ID
             acid: 账户 ID
-            event_time: 事件时间
             properties: dict 类型的用户属性
         """
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_set', send_type='user',
@@ -177,7 +176,6 @@ class DTAnalytics(object):
         Args:
             dt_id: 访客 ID
             acid: 账户 ID
-            event_time: 事件时间
             properties: dict 类型的用户属性
         """
         if isinstance(properties, list):
@@ -194,7 +192,6 @@ class DTAnalytics(object):
         Args:
             dt_id: 访客 ID
             acid: 账户 ID
-            event_time: 事件时间
             properties: dict 类型的用户属性
         """
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_set_once', send_type='user',
@@ -210,7 +207,6 @@ class DTAnalytics(object):
         Args:
             dt_id: 访客 ID
             acid: 账户 ID
-            event_time: 事件时间
             properties: 数值类型的用户属性
         """
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_add', send_type='user',
@@ -227,7 +223,6 @@ class DTAnalytics(object):
             dt_id: 访客 ID
             acid: 账户 ID
             event_name: 事件名称
-            event_time: 事件时间
             properties: 事件属性
 
         Raises:
@@ -246,7 +241,6 @@ class DTAnalytics(object):
             dt_id: 访客 ID
             acid: 账户 ID
             event_name: 事件名称
-            event_time: 事件时间
             properties: 事件属性
 
         Raises:
@@ -516,8 +510,7 @@ class DebugConsumer(BatchConsumer):
     def __init__(self, app_id, token, server_url=default_server_url, timeout=30000, interval=3, compress=True,
                  max_cache_size=50):
         super(DebugConsumer, self).__init__(app_id=app_id, token=token, server_url=server_url, batch=1, timeout=timeout,
-                                            interval=interval, \
-                                            compress=compress, max_cache_size=max_cache_size)
+                                            interval=interval, compress=compress, max_cache_size=max_cache_size)
 
 
 class AsyncBatchConsumer(object):
