@@ -13,7 +13,7 @@ import requests
 from requests import ConnectionError
 
 default_server_url = "https://s2s.roiquery.com/sync"
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 is_print = False
 
 __NAME_PATTERN = re.compile(r"^[#$a-zA-Z][a-zA-Z0-9_]{0,63}$", re.I)
@@ -515,7 +515,7 @@ class DebugConsumer(BatchConsumer):
 
 class AsyncBatchConsumer(object):
     """
-    异步、批量地向 TA 服务器发送数据的
+    异步、批量地向 DT 服务器发送数据
 
     AsyncBatchConsumer 使用独立的线程进行数据发送，当满足以下两个条件之一时触发数据上报:
     1. 数据条数大于预定义的最大值, 默认为 20 条
