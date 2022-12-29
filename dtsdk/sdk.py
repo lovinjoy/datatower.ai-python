@@ -13,7 +13,7 @@ import requests
 from requests import ConnectionError
 
 default_server_url = "https://s2s.roiquery.com/sync"
-__version__ = '1.0.1'
+__version__ = '1.1.0'
 is_print = False
 
 __NAME_PATTERN = re.compile(r"^[#$a-zA-Z][a-zA-Z0-9_]{0,63}$", re.I)
@@ -562,7 +562,11 @@ class AsyncBatchConsumer(object):
         self.flush()
         self.__flushing_thread.stop()
         while not self.__queue.empty():
+            log("当前未发送数据数: {}".format(self.__queue.qsize()))
             self._perform_request()
+
+    def _need_drain(self):
+        return self.__queue.qsize() > self.__batch
 
     def _perform_request(self):
         """
@@ -610,6 +614,9 @@ class AsyncBatchConsumer(object):
 
         def run(self):
             while True:
+                if self._consumer._need_drain():
+                    # 当当前queue size 大于batch size时，马上发送数据
+                    self._flush_event.set()
                 # 如果 _flush_event 标志位为 True，或者等待超过 _interval 则继续执行
                 self._flush_event.wait(self._interval)
                 self._consumer._perform_request()
