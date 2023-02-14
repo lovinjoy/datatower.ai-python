@@ -212,6 +212,39 @@ class DTAnalytics(object):
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_add', send_type='user',
                    properties_add=properties)
 
+    def user_append(self, dt_id=None, acid=None, properties=None):
+        """
+        对指定的**列表**类型的用户属性进行追加操作，列表内的元素都会转成字符串类型。
+
+        Args:
+            dt_id: 访客 ID
+            acid: 账户 ID
+            properties: 数值类型的用户属性
+        """
+        for key, value in properties.items():
+            if not isinstance(value, list):
+                raise DTIllegalDataException('#user_append properties must be list type')
+            properties[key] = [str(i) for i in value]
+
+        self.__add(dt_id=dt_id, acid=acid, event_name='#user_append', send_type='user',
+                   properties_add=properties)
+
+    def user_uniq_append(self, dt_id=None, acid=None, properties=None):
+        """
+        对指定的**列表**类型的用户属性进行追加操作，列表内的元素都会转成字符串类型，并对该属性的数组进行去重
+
+        Args:
+            dt_id: 访客 ID
+            acid: 账户 ID
+            properties: 数值类型的用户属性
+        """
+        for key, value in properties.items():
+            if not isinstance(value, list):
+                raise DTIllegalDataException('#user_uniq_append properties must be list type')
+            properties[key] = [str(i) for i in value]
+        self.__add(dt_id=dt_id, acid=acid, event_name='#user_uniq_append', send_type='user',
+                   properties_add=properties)
+
     def track(self, dt_id=None, acid=None, event_name=None, properties=None):
         """
         发送事件数据
