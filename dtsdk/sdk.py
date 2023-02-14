@@ -1,6 +1,7 @@
 # encoding:utf-8
 
 from __future__ import unicode_literals
+import copy
 import datetime
 import gzip
 import json
@@ -320,7 +321,7 @@ class DTAnalytics(object):
 
         data = {'#event_type': send_type}
         if properties_add:
-            properties = properties_add.copy()
+            properties = copy.deepcopy(properties_add)
         else:
             properties = {}
 
