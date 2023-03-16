@@ -293,7 +293,7 @@ class DTAnalytics(object):
         if dt_id is None and acid is None:
             raise DTMetaDataException("dt_id and acid must be set at least one")
         if (dt_id is not None and not is_str(dt_id)) or (acid is not None and not is_str(acid)):
-            raise DTException("dt_id and acid must be string type")
+            raise DTMetaDataException("dt_id and acid must be string type")
 
         assert_properties(event_name, properties_add)
 
@@ -553,7 +553,7 @@ class DebugConsumer(AbstractConsumer):
         return self.__app_id
 
     def add(self, msg):
-        self.__http_service.send(msg, str(len(msg)))
+        self.__http_service.send('[' + msg + ']', str(len(msg)))
 
     def flush(self):
         pass
