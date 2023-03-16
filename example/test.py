@@ -1,7 +1,7 @@
 # encoding:utf-8
 import os
 import sys
-
+import logging
 from dtsdk.sdk import DTException, DTAnalytics, BatchConsumer, AsyncBatchConsumer, DebugConsumer, DTIllegalDataException
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -11,7 +11,10 @@ dt = DTAnalytics(AsyncBatchConsumer(app_id="app_id_xxxx", token="xxxxxxxxxxxxxxx
                                     server_url="https://test.roiquery.com/sync"))
 # dt =DTAnalytics(BatchConsumer(app_id="app_id_xxxx", token="xxxxxxxxxxxxxxxxxxxxxxx"), debug=True)
 
-# DT日志开关
+# 查看日志
+# 需要初始化logging
+logging.basicConfig(level=logging.INFO)
+# 且打开日志开关
 dt.enable_log(True)
 
 
