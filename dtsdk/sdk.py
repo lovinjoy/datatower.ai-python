@@ -1,6 +1,7 @@
 # encoding:utf-8
 
 from __future__ import unicode_literals
+import copy
 import datetime
 import gzip
 import json
@@ -16,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 default_server_url = "https://s2s.roiquery.com/sync"
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 is_print = False
 
 __NAME_PATTERN = re.compile(r"^[#$a-zA-Z][a-zA-Z0-9_]{0,63}$", re.I)
@@ -222,9 +223,43 @@ class DTAnalytics(object):
         Args:
             dt_id: 访客 ID
             acid: 账户 ID
-            properties: 数值类型的用户属性
+            properties: Dict[str, int|float|double]
         """
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_add', send_type='user',
+                   properties_add=properties)
+
+    def user_append(self, dt_id=None, acid=None, properties=None):
+        """
+        对指定的**列表**类型的用户属性进行追加操作，列表内的元素都会转成字符串类型。
+
+        Args:
+            dt_id: 访客 ID
+            acid: 账户 ID
+            properties:  Dict[str, list]
+        """
+        for key, value in properties.items():
+            if not isinstance(value, list):
+                raise DTIllegalDataException('#user_append properties must be list type')
+            properties[key] = [str(i) for i in value]
+
+        self.__add(dt_id=dt_id, acid=acid, event_name='#user_append', send_type='user',
+                   properties_add=properties)
+
+    def user_uniq_append(self, dt_id=None, acid=None, properties=None):
+        """
+        对指定的**列表**类型的用户属性进行追加操作，列表内的元素都会转成字符串类型，并对该属性的数组进行去重
+
+        Args:
+            dt_id: 访客 ID
+            acid: 账户 ID
+            properties: Dict[str, list]
+        """
+        for key, value in properties.items():
+            if not isinstance(value, list):
+                raise DTIllegalDataException('#user_uniq_append properties must be list type')
+            properties[key] = [str(i) for i in value]
+
+        self.__add(dt_id=dt_id, acid=acid, event_name='#user_uniq_append', send_type='user',
                    properties_add=properties)
 
     def track(self, dt_id=None, acid=None, event_name=None, properties=None):
@@ -301,7 +336,7 @@ class DTAnalytics(object):
 
         data = {'#event_type': send_type}
         if properties_add:
-            properties = properties_add.copy()
+            properties = copy.deepcopy(properties_add)
         else:
             properties = {}
 
