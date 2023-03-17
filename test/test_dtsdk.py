@@ -3,6 +3,7 @@
 @Date   : 2023/3/15
 @author : vivi
 """
+import logging
 import pytest
 import unittest
 from dtsdk import DTAnalytics, DebugConsumer, DTNetworkException, DTIllegalDataException, DTMetaDataException
@@ -10,6 +11,8 @@ from dtsdk import DTAnalytics, DebugConsumer, DTNetworkException, DTIllegalDataE
 APP_ID = "app_id_xxxx"
 TOKEN = "xxxxxxxxxxxxxxxxxxxxxxx"
 SERVER_URL = "https://test.roiquery.com/sync"
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 class Fixtures(object):

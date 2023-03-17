@@ -85,8 +85,10 @@ def log(msg=None, level=logging.INFO):
         prefix = '[DataTower.ai-Python SDK V%s]' % __version__
         if level <= logging.INFO:
             logger.info("{}-{}".format(prefix, msg))
-        else:
+        elif level <= logging.WARNING:
             logger.warning("{}-{}".format(prefix, msg))
+        else:
+            logger.error("{}-{}".format(prefix, msg))
 
 
 class DTException(Exception):
@@ -641,6 +643,8 @@ class AsyncBatchConsumer(AbstractConsumer):
                 except DTIllegalDataException as e:
                     log("{}: {}".format(e, flush_buffer), level=logging.WARNING)
                     break
+            log("{}: {}".format("Data translate failed 3 times", flush_buffer), level=logging.ERROR)
+
 
     class _AsyncFlushThread(threading.Thread):
         def __init__(self, consumer, interval):
