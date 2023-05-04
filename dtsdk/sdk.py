@@ -17,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 default_server_url = "https://s2s.roiquery.com/sync"
-__version__ = '1.2.0'
+__version__ = '2.0.0'
 is_print = False
 
 __NAME_PATTERN = re.compile(r"^[#$a-zA-Z][a-zA-Z0-9_]{0,63}$", re.I)
