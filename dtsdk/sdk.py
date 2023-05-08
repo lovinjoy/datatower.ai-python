@@ -1,6 +1,7 @@
 # encoding:utf-8
 
 from __future__ import unicode_literals
+import copy
 import datetime
 import gzip
 import json
@@ -11,9 +12,12 @@ import time
 import random
 import requests
 from requests import ConnectionError
+import logging
+
+logger = logging.getLogger(__name__)
 
 default_server_url = "https://s2s.roiquery.com/sync"
-__version__ = '1.1.0'
+__version__ = '2.0.0'
 is_print = False
 
 __NAME_PATTERN = re.compile(r"^[#$a-zA-Z][a-zA-Z0-9_]{0,63}$", re.I)
@@ -77,9 +81,15 @@ def assert_properties(event_name, properties):
                 raise DTIllegalDataException('User_add properties must be number type')
 
 
-def log(msg=None):
-    if (msg is not None and is_print):
-        print('[DataTower.ai-Python SDK V%s]-%s' % (__version__, msg))
+def log(msg=None, level=logging.INFO):
+    if msg is not None and is_print:
+        prefix = '[DataTower.ai-Python SDK V%s]' % __version__
+        if level <= logging.INFO:
+            logger.info("{}-{}".format(prefix, msg))
+        elif level <= logging.WARNING:
+            logger.warning("{}-{}".format(prefix, msg))
+        else:
+            logger.error("{}-{}".format(prefix, msg))
 
 
 class DTException(Exception):
@@ -92,6 +102,12 @@ class DTIllegalDataException(DTException):
     在发送的数据格式有误时，SDK 会抛出此异常，用户应当捕获并处理.
     """
     pass
+
+
+class DTMetaDataException(DTException):
+    """
+    dt_id, acid, event_name, event_time 等元数据出错异常
+    """
 
 
 class DTNetworkException(DTException):
@@ -207,9 +223,43 @@ class DTAnalytics(object):
         Args:
             dt_id: 访客 ID
             acid: 账户 ID
-            properties: 数值类型的用户属性
+            properties: Dict[str, int|float|double]
         """
         self.__add(dt_id=dt_id, acid=acid, event_name='#user_add', send_type='user',
+                   properties_add=properties)
+
+    def user_append(self, dt_id=None, acid=None, properties=None):
+        """
+        对指定的**列表**类型的用户属性进行追加操作，列表内的元素都会转成字符串类型。
+
+        Args:
+            dt_id: 访客 ID
+            acid: 账户 ID
+            properties:  Dict[str, list]
+        """
+        for key, value in properties.items():
+            if not isinstance(value, list):
+                raise DTIllegalDataException('#user_append properties must be list type')
+            properties[key] = [str(i) for i in value]
+
+        self.__add(dt_id=dt_id, acid=acid, event_name='#user_append', send_type='user',
+                   properties_add=properties)
+
+    def user_uniq_append(self, dt_id=None, acid=None, properties=None):
+        """
+        对指定的**列表**类型的用户属性进行追加操作，列表内的元素都会转成字符串类型，并对该属性的数组进行去重
+
+        Args:
+            dt_id: 访客 ID
+            acid: 账户 ID
+            properties: Dict[str, list]
+        """
+        for key, value in properties.items():
+            if not isinstance(value, list):
+                raise DTIllegalDataException('#user_uniq_append properties must be list type')
+            properties[key] = [str(i) for i in value]
+
+        self.__add(dt_id=dt_id, acid=acid, event_name='#user_uniq_append', send_type='user',
                    properties_add=properties)
 
     def track(self, dt_id=None, acid=None, event_name=None, properties=None):
@@ -266,7 +316,7 @@ class DTAnalytics(object):
 
     def _public_track_add(self, event_name, properties):
         if not is_str(event_name):
-            raise DTIllegalDataException('a string type event_name is required for track')
+            raise DTMetaDataException('a string type event_name is required for track')
 
         all_properties = self.__preset_properties.copy()
         all_properties.update(self.__super_properties)
@@ -275,19 +325,18 @@ class DTAnalytics(object):
         if properties:
             all_properties.update(properties)
         return all_properties
-        pass
 
     def __add(self, dt_id, acid, send_type, event_name=None, properties_add=None):
         if dt_id is None and acid is None:
-            raise DTException("dt_id and acid must be set at least one")
+            raise DTMetaDataException("dt_id and acid must be set at least one")
         if (dt_id is not None and not is_str(dt_id)) or (acid is not None and not is_str(acid)):
-            raise DTException("dt_id and acid must be string type")
+            raise DTMetaDataException("dt_id and acid must be string type")
 
         assert_properties(event_name, properties_add)
 
         data = {'#event_type': send_type}
         if properties_add:
-            properties = properties_add.copy()
+            properties = copy.deepcopy(properties_add)
         else:
             properties = {}
 
@@ -296,7 +345,7 @@ class DTAnalytics(object):
         if '#event_time' not in data:
             self.__buildData(data, '#event_time', int(time.time() * 1000))
         if not is_int(data.get('#event_time')) or len(str(data.get('#event_time'))) != 13:
-            raise DTException("event_time must be timestamp (ms)")
+            raise DTMetaDataException("event_time must be timestamp (ms)")
 
         if '#event_syn' not in data:
             self.__buildData(data, '#event_syn', random_str(16))
@@ -313,9 +362,14 @@ class DTAnalytics(object):
         self.__buildData(data, '#event_name', event_name)
         self.__buildData(data, '#acid', acid)
         data['properties'] = properties
-        content = json.dumps(data, separators=(',', ':'), cls=DTDateTimeSerializer)
-        log('collect data={}'.format(content))
-        self.__consumer.add(content)
+        try:
+            content = json.dumps(data, separators=(',', ':'), cls=DTDateTimeSerializer, allow_nan=False)
+            log('collect data={}'.format(data))
+            self.__consumer.add(content)
+        except TypeError as e:
+            raise DTIllegalDataException(e)
+        except ValueError:
+            raise DTIllegalDataException("Nan or Inf data are not allowed")
 
     def __buildData(self, data, key, value):
         if value is not None:
@@ -413,7 +467,24 @@ class _DTFileLock(object):
         _unlock(self._file_handler)
 
 
-class BatchConsumer(object):
+class AbstractConsumer(object):
+    """
+        Consumer抽象类
+    """
+    def get_app_id(self):
+        raise NotImplementedError
+
+    def add(self, msg):
+        raise NotImplementedError
+
+    def flush(self):
+        raise NotImplementedError
+
+    def close(self):
+        raise NotImplementedError
+
+
+class BatchConsumer(AbstractConsumer):
     """
     同步、批量地向 DT 服务器传输数据
 
@@ -466,7 +537,8 @@ class BatchConsumer(object):
         while len(self.__cache_buffer) > 0 or len(self.__message_channel) > 0:
             try:
                 self.flush_once(throw_exception)
-            except DTIllegalDataException:
+            except DTIllegalDataException as e:
+                log(e, level=logging.WARNING)
                 continue
 
     def flush_once(self, throw_exception=True):
@@ -503,17 +575,31 @@ class BatchConsumer(object):
     def close(self):
         self.flush()
 
-    pass
+
+class DebugConsumer(AbstractConsumer):
+    def __init__(self, app_id, token, server_url=default_server_url, timeout=30000):
+
+        self.__message_channel = []
+        self.__cache_buffer = []
+        self.__last_flush = time.time()
+        self.__http_service = _HttpServices((urlparse(server_url)).geturl(), app_id, token, timeout, compress=False)
+        self.__app_id = app_id
+        DTAnalytics.enable_log(True)
+
+    def get_app_id(self):
+        return self.__app_id
+
+    def add(self, msg):
+        self.__http_service.send('[' + msg + ']', str(len(msg)))
+
+    def flush(self):
+        pass
+
+    def close(self):
+        pass
 
 
-class DebugConsumer(BatchConsumer):
-    def __init__(self, app_id, token, server_url=default_server_url, timeout=30000, interval=3, compress=True,
-                 max_cache_size=50):
-        super(DebugConsumer, self).__init__(app_id=app_id, token=token, server_url=server_url, batch=1, timeout=timeout,
-                                            interval=interval, compress=compress, max_cache_size=max_cache_size)
-
-
-class AsyncBatchConsumer(object):
+class AsyncBatchConsumer(AbstractConsumer):
     """
     异步、批量地向 DT 服务器发送数据
 
@@ -586,10 +672,14 @@ class AsyncBatchConsumer(object):
                 try:
                     self.__http_service.send('[' + ','.join(flush_buffer) + ']', str(len(flush_buffer)))
                     return True
-                except DTNetworkException:
-                    pass
-                except DTIllegalDataException:
+                except DTNetworkException as e:
+                    log("{}: {}".format(e, flush_buffer), level=logging.WARNING)
+                    continue
+                except DTIllegalDataException as e:
+                    log("{}: {}".format(e, flush_buffer), level=logging.WARNING)
                     break
+            log("{}: {}".format("Data translate failed 3 times", flush_buffer), level=logging.ERROR)
+
 
     class _AsyncFlushThread(threading.Thread):
         def __init__(self, consumer, interval):
@@ -647,12 +737,12 @@ class _HttpServices(object):
     指定接收端地址和项目 APP ID, 实现向接收端上传数据的接口. 发送前将数据默认使用 Gzip 压缩,
     """
 
-    def __init__(self, server_uri, app_id, token, timeout=30000):
+    def __init__(self, server_uri, app_id, token, timeout=30000, compress=True):
         self.url = server_uri
         self.app_id = app_id
         self.token = token
         self.timeout = timeout
-        self.compress = True
+        self.compress = compress
 
     def send(self, data, length):
         """使用 Requests 发送数据给服务器
@@ -675,15 +765,15 @@ class _HttpServices(object):
                 compress_type = 'none'
                 data = data.encode("utf-8")
             headers['compress'] = compress_type
-            # print(self.url,data,headers)
             response = requests.post(self.url, data=data, headers=headers, timeout=self.timeout)
             if response.status_code == 200:
-                responseData = json.loads(response.text)
-                log('response={}'.format(responseData))
-                if responseData["code"] == 0:
+                response_data = json.loads(response.text)
+                log('response={}'.format(response_data))
+                if response_data["code"] == 0:
                     return True
                 else:
-                    raise DTIllegalDataException("Unexpected result code: " + str(responseData["code"]))
+                    raise DTIllegalDataException("Unexpected result code: " + str(response_data["code"]) \
+                                                 + " reason: " + response_data["msg"])
             else:
                 log('response={}'.format(response.status_code))
                 raise DTNetworkException("Unexpected Http status code " + str(response.status_code))
